@@ -10,6 +10,7 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
 
+    # Mirrors docker-compose.test.yml (postgres:16-alpine, database customoauth)
     services:
       postgres:
         image: postgres:16-alpine

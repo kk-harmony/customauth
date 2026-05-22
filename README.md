@@ -356,14 +356,30 @@ curl -s "$BASE/api/me" -H "Authorization: Bearer $ACCESS_TOKEN"
 
 ## Tests
 
+Integration tests need PostgreSQL. The repo includes **`docker-compose.test.yml`** (Postgres 16 only).
+
+### Recommended (Postgres container + tests)
+
 ```bash
+chmod +x scripts/*.sh
+./scripts/run-tests.sh
+```
+
+This starts `docker-compose.test.yml`, applies SQL migrations, sets `CUSTOMOAUTH_TEST_CONNECTION`, and runs `dotnet test`.
+
+### Manual
+
+```bash
+docker compose -f docker-compose.test.yml up -d --wait
+export CUSTOMOAUTH_TEST_CONNECTION='Host=localhost;Port=5432;Database=customoauth;Username=postgres;Password=postgres'
+./scripts/apply-sql-migrations.sh
 dotnet test CustomOAuthServer.sln --configuration Release
 ```
 
-Integration tests require PostgreSQL via one of:
+Other options:
 
 1. **Docker Desktop** ù Testcontainers starts `postgres:16-alpine` automatically
-2. **`docker compose up -d postgres`** ù uses `localhost:5432` / database `customoauth`
+2. **`docker compose up -d postgres`** from main `docker-compose.yml` (same port/database)
 3. **`CUSTOMOAUTH_TEST_CONNECTION`** ù custom connection string (use **single quotes** in bash if the password contains `$`)
 
 If PostgreSQL is unavailable, integration tests are **skipped** (reported as skipped, not passed silently).
@@ -381,7 +397,7 @@ If PostgreSQL is unavailable, integration tests are **skipped** (reported as ski
 | UserInfo | Yes |
 | Introspection + revocation | Yes |
 
-CI runs on GitHub Actions with a PostgreSQL service (see `.github/workflows/ci.yml`).
+CI runs on GitHub Actions with a PostgreSQL service container (same settings as `docker-compose.test.yml`; see `.github/workflows/ci.yml`).
 
 ## Verify
 
@@ -392,7 +408,7 @@ dotnet test CustomOAuthServer.sln --configuration Release
 
 ## Security notes
 
-- Development uses auto-generated signing certificates; **Production requires a PFX** ó see [Create signing PFX for Production](#create-signing-pfx-for-production).
+- Development uses auto-generated signing certificates; **Production requires a PFX** ù see [Create signing PFX for Production](#create-signing-pfx-for-production).
 - Replace all default client secrets before deployment.
 - Terminate TLS at a reverse proxy or bind HTTPS directly; set `OAuthServer__Issuer` to the public URL.
 - Token endpoint rate limit: 60 requests/minute per IP (`POST:/connect/token`).

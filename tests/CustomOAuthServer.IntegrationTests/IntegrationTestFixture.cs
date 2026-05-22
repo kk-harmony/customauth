@@ -39,7 +39,8 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         if (connectionString is null)
         {
             SkipReason =
-                "PostgreSQL is not available. Start Docker Desktop, run 'docker compose up -d postgres', " +
+                "PostgreSQL is not available. Run './scripts/run-tests.sh' or " +
+                "'docker compose -f docker-compose.test.yml up -d --wait', " +
                 "or set CUSTOMOAUTH_TEST_CONNECTION to a valid connection string.";
             return;
         }
