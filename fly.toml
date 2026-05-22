@@ -1,0 +1,47 @@
+# fly.toml app configuration file generated for customauth on 2026-05-23T05:46:33Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'customauth'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  ASPNETCORE_ENVIRONMENT = 'Production'
+  ASPNETCORE_URLS = 'http://+:8080'
+  OAUTH_AUTO_GENERATE_SIGNING_CERT = 'true'
+  OAuthServer__SigningCertificatePath = '/data/certs/signing.pfx'
+  # Public URL / CORS
+  OAuthServer__Issuer = 'https://customauth.fly.dev/'
+  OAuthServer__CorsRootDomain = 'customauth.fly.dev'
+  AllowedHosts = 'customauth.fly.dev'
+  OAuthServer__AllowedOrigins__0 = 'https://localauthmgm.netlify.app'
+  OAuthServer__AllowedOrigins__1 = 'https://nepalishabda.netlify.app'
+  Seed__Enabled = 'false'
+  Seed__DemoUsers = 'false'
+  Serilog__MinimumLevel = 'Warning'
+
+[[mounts]]
+  source = 'certs'
+  destination = '/data/certs'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 250
+    soft_limit = 200
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024

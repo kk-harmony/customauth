@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS migrate
+WORKDIR /src
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY CustomOAuthServer.sln ./
+COPY .config/ .config/
+COPY scripts/ scripts/
+COPY Migrations/ Migrations/
+COPY src/CustomOAuthServer.Application/ src/CustomOAuthServer.Application/
+COPY src/CustomOAuthServer.Infrastructure/ src/CustomOAuthServer.Infrastructure/
+COPY src/CustomOAuthServer.Api/ src/CustomOAuthServer.Api/
+
+RUN chmod +x scripts/apply-sql-migrations.sh scripts/run-database-migrations.sh
+
+ENTRYPOINT ["/bin/bash", "scripts/run-database-migrations.sh"]

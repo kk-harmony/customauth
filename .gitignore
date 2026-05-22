@@ -1,0 +1,46 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.log
+
+## IDE
+.vs/
+.idea/
+*.swp
+*~
+
+## Secrets / local env
+.env
+.env.local
+appsettings.*.local.json
+secrets.json
+
+## Test / tooling
+TestResults/
+coverage/
+*.trx
+*.coverage
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Certificates (never commit private keys)
+*.pfx
+*.p12
+!certs/.gitkeep
