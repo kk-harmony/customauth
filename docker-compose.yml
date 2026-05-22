@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: customoauth
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=customoauth;Username=postgres;Password=postgres"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=customoauth;Username=postgres;Password=postgres"
+      OAuthServer__Issuer: "http://localhost:8080/"
+      Seed__Enabled: "true"
+      Seed__DemoUsers: "true"
+      Seed__DemoUserPassword: "Password123!"
+      Seed__ClientSecrets__m2m-client: "m2m-secret-change-in-production"
+      Seed__ClientSecrets__obo-client: "obo-secret-change-in-production"
+      Seed__ClientSecrets__introspection-client: "introspection-secret-change-in-production"
+      Seed__ClientSecrets__admin-client: "admin-secret-change-in-production"
+      Serilog__LogFilePath: "/app/logs/customoauth-.log"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

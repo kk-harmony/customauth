@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.0" />
+    <PackageReference Include="Npgsql" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="OpenIddict.Core" Version="6.2.1" />
+    <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="6.2.1" />
+    <PackageReference Include="OpenIddict.Server" Version="6.2.1" />
+    <PackageReference Include="OpenIddict.Server.AspNetCore" Version="6.2.1" />
+    <PackageReference Include="OpenIddict.Validation" Version="6.2.1" />
+    <PackageReference Include="OpenIddict.Validation.AspNetCore" Version="6.2.1" />
+    <PackageReference Include="OpenIddict.Validation.ServerIntegration" Version="6.2.1" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CustomOAuthServer.Application\CustomOAuthServer.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\Migrations\Sql\*.sql" Link="Migrations\Sql\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
