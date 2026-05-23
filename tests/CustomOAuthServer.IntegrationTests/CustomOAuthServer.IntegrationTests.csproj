@@ -27,4 +27,8 @@
     <ProjectReference Include="..\..\src\CustomOAuthServer.Api\CustomOAuthServer.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\Migrations\Sql\*.sql" Link="Migrations\Sql\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

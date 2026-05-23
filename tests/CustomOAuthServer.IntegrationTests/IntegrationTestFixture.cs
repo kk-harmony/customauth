@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using CustomOAuthServer.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -29,6 +31,8 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", Environments.Development);
+
         var connectionString = Environment.GetEnvironmentVariable("CUSTOMOAUTH_TEST_CONNECTION");
         if (string.IsNullOrWhiteSpace(connectionString))
         {

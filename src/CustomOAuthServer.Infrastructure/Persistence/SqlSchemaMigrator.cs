@@ -53,16 +53,9 @@ public static class SqlSchemaMigrator
 
     public static string? ResolveSqlScriptsPath()
     {
-        var candidates = new[]
+        foreach (var root in GetSearchRoots())
         {
-            Path.Combine(AppContext.BaseDirectory, "Migrations", "Sql"),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "Migrations", "Sql")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Migrations", "Sql")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "Migrations", "Sql"))
-        };
-
-        foreach (var path in candidates)
-        {
+            var path = Path.Combine(root, "Migrations", "Sql");
             if (Directory.Exists(path))
             {
                 return path;
@@ -70,5 +63,18 @@ public static class SqlSchemaMigrator
         }
 
         return null;
+    }
+
+    private static IEnumerable<string> GetSearchRoots()
+    {
+        yield return AppContext.BaseDirectory;
+        yield return Directory.GetCurrentDirectory();
+
+        var dir = AppContext.BaseDirectory;
+        for (var i = 0; i < 8 && !string.IsNullOrEmpty(dir); i++)
+        {
+            dir = Path.GetFullPath(Path.Combine(dir, ".."));
+            yield return dir;
+        }
     }
 }

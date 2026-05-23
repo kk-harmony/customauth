@@ -16,8 +16,6 @@ using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-ProductionConfigurationValidator.ValidateIfProduction(builder.Environment);
-
 builder.Host.UseSerilog((context, services, configuration) =>
 {
     var serilogOptions = context.Configuration.GetSection(SerilogOptions.SectionName).Get<SerilogOptions>()
@@ -113,6 +111,8 @@ builder.Services.AddInMemoryRateLimiting();
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 
 var app = builder.Build();
+
+ProductionConfigurationValidator.ValidateIfProduction(app.Environment);
 
 app.UseForwardedHeaders();
 
