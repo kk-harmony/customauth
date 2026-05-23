@@ -1,5 +1,5 @@
 # Fly.io app config — replace APP_NAME before deploy: fly apps create APP_NAME
-app = "APP_NAME"
+app = "customauth"
 primary_region = "iad"
 
 [build]
