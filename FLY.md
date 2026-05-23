@@ -1,4 +1,4 @@
-# Fly.io deployment ó environment variables
+# Fly.io deployment ù environment variables
 
 Deploy **CustomOAuthServer** on [Fly.io](https://fly.io) using the default `Dockerfile`. Production configuration is **environment variables only** (see [PRODUCTION.md](PRODUCTION.md)).
 
@@ -16,8 +16,9 @@ Public OAuth URL: **`https://APP_NAME.fly.dev/`**
 ## Quick start (secrets)
 
 ```bash
-# 1. Create app + Postgres (if not already)
+# 1. Create app, signing cert volume, and Postgres
 fly apps create APP_NAME
+fly volumes create certs --size 1 -a APP_NAME -r iad
 fly postgres create --name APP_NAME-db
 fly postgres attach APP_NAME-db -a APP_NAME
 
@@ -28,14 +29,13 @@ fly secrets set -a APP_NAME \
   OAuthServer__Issuer='https://APP_NAME.fly.dev/' \
   OAuthServer__CorsRootDomain='APP_NAME.fly.dev' \
   OAuthServer__AllowedOrigins__0='SPA_ORIGIN' \
-  OAuthServer__SigningCertificatePath='/run/secrets/signing.pfx' \
   OAuthServer__SigningCertificatePassword='YOUR_PFX_PASSWORD' \
   AllowedHosts='APP_NAME.fly.dev' \
   Seed__Enabled=false \
   Seed__DemoUsers=false
 
-# 3. Run migrations (from your machine or CI ó see below)
-# 4. Deploy
+# 3. Run migrations (from your machine or CI ù see below)
+# 4. Deploy (auto-creates signing.pfx on the volume on first boot)
 fly deploy -a APP_NAME
 ```
 
@@ -50,9 +50,9 @@ These must be set as **Fly secrets** (or `[env]` in `fly.toml` for non-secret va
 | `ASPNETCORE_ENVIRONMENT` | `Production` | Must be `Production` on Fly |
 | `ConnectionStrings__DefaultConnection` | Npgsql connection string | From Fly Postgres attach or dashboard |
 | `OAuthServer__Issuer` | `https://customoauth.fly.dev/` | Public HTTPS URL + **trailing slash** |
-| `OAuthServer__CorsRootDomain` | `customoauth.fly.dev` | OAuth app host + `*.customoauth.fly.dev` ó **not** `fly.dev` |
-| `OAuthServer__SigningCertificatePath` | `/run/secrets/signing.pfx` | Path to signing PFX inside the container |
-| `OAuthServer__SigningCertificatePassword` | *(secret)* | PFX password |
+| `OAuthServer__CorsRootDomain` | `customoauth.fly.dev` | OAuth app host + `*.customoauth.fly.dev` ù **not** `fly.dev` |
+| `OAuthServer__SigningCertificatePassword` | *(secret)* | PFX password; used when auto-generating the cert |
+| `OAuthServer__SigningCertificatePath` | `/data/certs/signing.pfx` | Optional ù default in `fly.toml`; set by entrypoint if auto-generate is on |
 
 ### ASP.NET / hosting
 
@@ -71,7 +71,7 @@ These must be set as **Fly secrets** (or `[env]` in `fly.toml` for non-secret va
 | SPA on **another** Fly app (`my-spa.fly.dev`) | `OAuthServer__AllowedOrigins__0=https://my-spa.fly.dev` |
 | SPA on custom domain (`app.example.com`) | `OAuthServer__AllowedOrigins__0=https://app.example.com` and/or `OAuthServer__CorsRootDomain=example.com` |
 
-**Do not** set `OAuthServer__CorsRootDomain=fly.dev` ó that would allow CORS from arbitrary `*.fly.dev` apps.
+**Do not** set `OAuthServer__CorsRootDomain=fly.dev` ù that would allow CORS from arbitrary `*.fly.dev` apps.
 
 Development uses allow-all CORS; Production uses `CorsRootDomain` + `AllowedOrigins` only.
 
@@ -98,19 +98,16 @@ Or copy the connection string from the Fly Postgres dashboard.
 
 ---
 
-## Signing certificate (PFX)
+## Signing certificate (PFX) ó auto-generated on deploy
 
-Production requires a real signing certificate ó not OpenIddict development certs.
+The Docker **entrypoint** runs `scripts/ensure-signing-cert.sh` on each start. If `/data/certs/signing.pfx` is missing, it generates a self-signed PFX using OpenSSL (requires `OAuthServer__SigningCertificatePassword` and the **`certs` volume** in `fly.toml`).
 
-Fly secrets are **environment variables**, not files. Options:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OAUTH_AUTO_GENERATE_SIGNING_CERT` | `true` | Set `false` to supply your own PFX |
+| `OAuthServer__SigningCertificatePath` | `/data/certs/signing.pfx` | Path on the mounted volume |
 
-| Approach | Notes |
-|----------|--------|
-| **Volume** | Mount a Fly volume at `/run/secrets`, upload `signing.pfx` once |
-| **Base64 secret + entrypoint** | Store `SIGNING_PFX_BASE64`, decode to `/run/secrets/signing.pfx` at container start (custom entrypoint) |
-| **CI bake** | Not recommended for production |
-
-Point `OAuthServer__SigningCertificatePath` at the path where the PFX exists inside the running machine.
+Disable auto-generation and upload your own PFX to the volume via `fly ssh console` if you use a CA-issued cert (see [README](README.md#create-signing-pfx-for-production)).
 
 Optional encryption cert:
 
@@ -162,7 +159,7 @@ Prefer **stdout** (Fly aggregates `fly logs`). Avoid file-only logging on epheme
 
 ## Database migrations (not on app startup)
 
-Run **before** or **during** deploy from CI or your laptop ó the runtime Docker image does not include `psql` / `dotnet ef`.
+Run **before** or **during** deploy from CI or your laptop ù the runtime Docker image does not include `psql` / `dotnet ef`.
 
 ```bash
 # Example: proxy Fly Postgres locally
@@ -180,26 +177,9 @@ Requires committed EF migrations under `src/CustomOAuthServer.Infrastructure/Mig
 
 ---
 
-## Example `fly.toml` (non-secret env)
+## `fly.toml`
 
-```toml
-app = "APP_NAME"
-primary_region = "iad"
-
-[build]
-  dockerfile = "Dockerfile"
-
-[env]
-  ASPNETCORE_ENVIRONMENT = "Production"
-  ASPNETCORE_URLS = "http://+:8080"
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = false
-  auto_start_machines = true
-  min_machines_running = 1
-```
+The repo includes **[fly.toml](fly.toml)** with `[mounts]` for `/data/certs` and auto-PFX env defaults. Set `app = "APP_NAME"` before deploy.
 
 Secrets override `[env]` where the same key is set via `fly secrets set`.
 
@@ -251,7 +231,6 @@ fly secrets set -a "$APP_NAME" \
   OAuthServer__Issuer="$ISSUER" \
   OAuthServer__CorsRootDomain="${APP_NAME}.fly.dev" \
   OAuthServer__AllowedOrigins__0="$SPA_ORIGIN" \
-  OAuthServer__SigningCertificatePath=/run/secrets/signing.pfx \
   OAuthServer__SigningCertificatePassword="$PFX_PASSWORD" \
   AllowedHosts="${APP_NAME}.fly.dev" \
   Seed__Enabled=false \
@@ -263,6 +242,6 @@ fly secrets set -a "$APP_NAME" \
 
 ## Related docs
 
-- [PRODUCTION.md](PRODUCTION.md) ó full production checklist
-- [README.md](README.md) ó local development and OAuth endpoints
-- [.env.example](.env.example) ó variable naming reference (development)
+- [PRODUCTION.md](PRODUCTION.md) ù full production checklist
+- [README.md](README.md) ù local development and OAuth endpoints
+- [.env.example](.env.example) ù variable naming reference (development)

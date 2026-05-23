@@ -6,7 +6,6 @@ public static class ProductionConfigurationValidator
     [
         "ConnectionStrings__DefaultConnection",
         "OAuthServer__Issuer",
-        "OAuthServer__SigningCertificatePath",
         "OAuthServer__SigningCertificatePassword",
         "OAuthServer__CorsRootDomain"
     ];
@@ -18,7 +17,19 @@ public static class ProductionConfigurationValidator
             return;
         }
 
-        var missing = RequiredEnvironmentVariables
+        var required = new List<string>(RequiredEnvironmentVariables);
+
+        var autoGenerate = !string.Equals(
+            Environment.GetEnvironmentVariable("OAUTH_AUTO_GENERATE_SIGNING_CERT"),
+            "false",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!autoGenerate)
+        {
+            required.Add("OAuthServer__SigningCertificatePath");
+        }
+
+        var missing = required
             .Where(name => string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(name)))
             .ToList();
 
