@@ -1,6 +1,6 @@
 # Fly.io app config — replace APP_NAME before deploy: fly apps create APP_NAME
 app = "customauth"
-primary_region = "iad"
+primary_region = "ord"
 
 [build]
   dockerfile = "Dockerfile"
