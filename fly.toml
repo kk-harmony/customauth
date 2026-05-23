@@ -1,23 +1,37 @@
-# fly.toml app configuration file generated for customauth on 2026-05-22T23:20:29Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
-app = 'customauth'
-primary_region = 'ord'
+# Fly.io app config — replace APP_NAME before deploy: fly apps create APP_NAME
+app = "APP_NAME"
+primary_region = "iad"
 
 [build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_URLS = "http://+:8080"
+  OAUTH_AUTO_GENERATE_SIGNING_CERT = "true"
+  OAuthServer__SigningCertificatePath = "/data/certs/signing.pfx"
+
+# Persist generated signing.pfx across restarts (required for auto-generation)
+[mounts]
+  source = "certs"
+  destination = "/data/certs"
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
+  min_machines_running = 1
 
-[[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 256
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+# Set secrets before deploy (see FLY.md):
+#   ConnectionStrings__DefaultConnection
+#   OAuthServer__Issuer
+#   OAuthServer__SigningCertificatePassword
+#   OAuthServer__CorsRootDomain
+#   AllowedHosts
+#   Seed__Enabled=false

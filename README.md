@@ -125,7 +125,7 @@ openssl pkcs12 -export \
 | Target | Notes |
 |--------|--------|
 | **Docker / VM** | Mount `certs/signing.pfx` read-only (e.g. `/run/secrets/signing.pfx`) |
-| **Fly.io** | Secrets are env-based ù mount via volume or decode base64 at startup; see [FLY.md](FLY.md) |
+| **Fly.io** | Auto-generated on first deploy to `/data/certs` volume; see [FLY.md](FLY.md) |
 | **Rotation** | New PFX invalidates existing tokens; plan overlap or maintenance window |
 
 ## Database schema

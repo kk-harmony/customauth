@@ -10,7 +10,18 @@ RUN dotnet publish src/CustomOAuthServer.Api/CustomOAuthServer.Api.csproj -c Rel
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV ASPNETCORE_URLS=http://+:8080
+ENV OAUTH_AUTO_GENERATE_SIGNING_CERT=true
+ENV OAuthServer__SigningCertificatePath=/data/certs/signing.pfx
+
 EXPOSE 8080
 COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "CustomOAuthServer.Api.dll"]
+COPY scripts/ensure-signing-cert.sh scripts/docker-entrypoint.sh /app/scripts/
+RUN chmod +x /app/scripts/ensure-signing-cert.sh /app/scripts/docker-entrypoint.sh
+
+ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]
