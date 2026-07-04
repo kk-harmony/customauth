@@ -24,6 +24,7 @@ internal static class ClientDescriptorBuilder
 
         ApplyUris(descriptor, request.RedirectUris, request.PostLogoutRedirectUris);
         ApplyPermissions(descriptor, request.GrantTypes, request.Scopes, request.RequirePkce);
+        ClientAudienceProperties.SetAllowedAudiences(descriptor.Properties, request.AllowedAudiences);
 
         return descriptor;
     }
@@ -57,6 +58,11 @@ internal static class ClientDescriptorBuilder
             descriptor.Requirements.Clear();
             ApplyPermissions(descriptor, grantTypes, scopes, requirePkce);
         }
+
+        if (request.AllowedAudiences is not null)
+        {
+            ClientAudienceProperties.SetAllowedAudiences(descriptor.Properties, request.AllowedAudiences);
+        }
     }
 
     public static ClientResponse ToResponse(
@@ -70,6 +76,7 @@ internal static class ClientDescriptorBuilder
             descriptor.PostLogoutRedirectUris.Select(u => u.ToString()).ToList(),
             ExtractGrantTypes(descriptor.Permissions),
             ExtractScopes(descriptor.Permissions),
+            ClientAudienceProperties.GetAllowedAudiences(descriptor.Properties),
             descriptor.Requirements.Contains(Requirements.Features.ProofKeyForCodeExchange));
 
     private static void ApplyUris(

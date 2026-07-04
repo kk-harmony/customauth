@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using CustomOAuthServer.Application.OAuth;
 using FluentAssertions;
 using Xunit;
 
@@ -62,20 +63,100 @@ public sealed class OAuthFlowTests(IntegrationTestFixture fixture)
     {
         Skip.If(fixture.SkipReason is not null, fixture.SkipReason);
 
+        var (verifier, challenge) = OAuthTestHelper.CreatePkcePair();
+        using var cookieClient = OAuthTestHelper.CreateCookieClient(fixture);
+        var (userAccessToken, _) = await OAuthTestHelper.AuthorizeWithPkceAsync(cookieClient, verifier, challenge);
+
+        using var client = fixture.CreateClient();
+        var exchanged = await OAuthTestHelper.ExchangeUserTokenAsync(
+            client,
+            userAccessToken,
+            audience: "resource_server");
+
+        var exchangedAccessToken = exchanged.GetProperty("access_token").GetString();
+        exchangedAccessToken.Should().NotBeNullOrEmpty();
+
+        var introspection = await OAuthTestHelper.IntrospectTokenAsync(
+            client,
+            exchangedAccessToken!,
+            clientId: "obo-client",
+            clientSecret: OAuthTestHelper.OboClientSecret);
+        introspection.GetProperty("active").GetBoolean().Should().BeTrue();
+        introspection.GetProperty("sub").GetString().Should().Be("user-alice");
+        introspection.GetProperty("aud").GetString().Should().Be("resource_server");
+        introspection.GetProperty("client_id").GetString().Should().Be("obo-client");
+    }
+
+    [SkippableFact]
+    public async Task Token_exchange_rejects_client_credentials_subject()
+    {
+        Skip.If(fixture.SkipReason is not null, fixture.SkipReason);
+
         using var client = fixture.CreateClient();
         var subjectToken = await OAuthTestHelper.GetClientCredentialsTokenAsync(client);
 
-        var exchanged = await OAuthTestHelper.RequestTokenAsync(client, new Dictionary<string, string>
+        var (statusCode, body) = await OAuthTestHelper.RequestTokenWithStatusAsync(client, new Dictionary<string, string>
         {
-            ["grant_type"] = "urn:ietf:params:oauth:grant-type:token-exchange",
+            ["grant_type"] = OAuthGrantTypes.TokenExchange,
             ["client_id"] = "obo-client",
             ["client_secret"] = OAuthTestHelper.OboClientSecret,
             ["subject_token"] = subjectToken,
-            ["subject_token_type"] = "urn:ietf:params:oauth:token-type:access_token",
+            ["subject_token_type"] = OAuthTokenTypes.AccessToken,
+            ["audience"] = "resource_server",
             ["scope"] = "api"
         });
 
-        exchanged.GetProperty("access_token").GetString().Should().NotBeNullOrEmpty();
+        statusCode.Should().Be(HttpStatusCode.BadRequest);
+        body.GetProperty("error").GetString().Should().Be("invalid_grant");
+    }
+
+    [SkippableFact]
+    public async Task Token_exchange_requires_audience()
+    {
+        Skip.If(fixture.SkipReason is not null, fixture.SkipReason);
+
+        var (verifier, challenge) = OAuthTestHelper.CreatePkcePair();
+        using var cookieClient = OAuthTestHelper.CreateCookieClient(fixture);
+        var (userAccessToken, _) = await OAuthTestHelper.AuthorizeWithPkceAsync(cookieClient, verifier, challenge);
+
+        using var client = fixture.CreateClient();
+        var (statusCode, body) = await OAuthTestHelper.RequestTokenWithStatusAsync(client, new Dictionary<string, string>
+        {
+            ["grant_type"] = OAuthGrantTypes.TokenExchange,
+            ["client_id"] = "obo-client",
+            ["client_secret"] = OAuthTestHelper.OboClientSecret,
+            ["subject_token"] = userAccessToken,
+            ["subject_token_type"] = OAuthTokenTypes.AccessToken,
+            ["scope"] = "api"
+        });
+
+        statusCode.Should().Be(HttpStatusCode.BadRequest);
+        body.GetProperty("error").GetString().Should().Be("invalid_request");
+    }
+
+    [SkippableFact]
+    public async Task Token_exchange_rejects_disallowed_audience()
+    {
+        Skip.If(fixture.SkipReason is not null, fixture.SkipReason);
+
+        var (verifier, challenge) = OAuthTestHelper.CreatePkcePair();
+        using var cookieClient = OAuthTestHelper.CreateCookieClient(fixture);
+        var (userAccessToken, _) = await OAuthTestHelper.AuthorizeWithPkceAsync(cookieClient, verifier, challenge);
+
+        using var client = fixture.CreateClient();
+        var (statusCode, body) = await OAuthTestHelper.RequestTokenWithStatusAsync(client, new Dictionary<string, string>
+        {
+            ["grant_type"] = OAuthGrantTypes.TokenExchange,
+            ["client_id"] = "obo-client",
+            ["client_secret"] = OAuthTestHelper.OboClientSecret,
+            ["subject_token"] = userAccessToken,
+            ["subject_token_type"] = OAuthTokenTypes.AccessToken,
+            ["audience"] = "unknown-api",
+            ["scope"] = "api"
+        });
+
+        statusCode.Should().Be(HttpStatusCode.BadRequest);
+        body.GetProperty("error").GetString().Should().Be("invalid_target");
     }
 
     [SkippableFact]

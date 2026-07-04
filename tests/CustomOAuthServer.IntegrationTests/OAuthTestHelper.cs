@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using CustomOAuthServer.Application.OAuth;
 using FluentAssertions;
 
 namespace CustomOAuthServer.IntegrationTests;
@@ -45,6 +46,58 @@ internal static class OAuthTestHelper
             throw new HttpRequestException($"Token request failed ({(int)response.StatusCode}): {body}");
         }
 
+        return JsonDocument.Parse(body).RootElement;
+    }
+
+    public static async Task<(HttpStatusCode StatusCode, JsonElement Body)> RequestTokenWithStatusAsync(
+        HttpClient client,
+        IReadOnlyDictionary<string, string> form)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/connect/token");
+        request.Content = new FormUrlEncodedContent(form);
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+        var json = string.IsNullOrWhiteSpace(body)
+            ? JsonDocument.Parse("{}").RootElement
+            : JsonDocument.Parse(body).RootElement;
+        return (response.StatusCode, json);
+    }
+
+    public static async Task<JsonElement> ExchangeUserTokenAsync(
+        HttpClient client,
+        string subjectToken,
+        string audience,
+        string scopes = "api")
+    {
+        return await RequestTokenAsync(client, new Dictionary<string, string>
+        {
+            ["grant_type"] = OAuthGrantTypes.TokenExchange,
+            ["client_id"] = "obo-client",
+            ["client_secret"] = OboClientSecret,
+            ["subject_token"] = subjectToken,
+            ["subject_token_type"] = OAuthTokenTypes.AccessToken,
+            ["audience"] = audience,
+            ["scope"] = scopes
+        });
+    }
+
+    public static async Task<JsonElement> IntrospectTokenAsync(
+        HttpClient client,
+        string accessToken,
+        string clientId = "m2m-client",
+        string clientSecret = M2MClientSecret)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/connect/introspect");
+        request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["token"] = accessToken,
+            ["client_id"] = clientId,
+            ["client_secret"] = clientSecret
+        });
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "introspection error: {0}", body);
         return JsonDocument.Parse(body).RootElement;
     }
 

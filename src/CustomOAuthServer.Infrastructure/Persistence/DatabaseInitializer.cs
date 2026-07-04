@@ -201,7 +201,7 @@ public sealed class DatabaseInitializer(
 
         if (await applicationManager.FindByClientIdAsync("obo-client", cancellationToken) is null)
         {
-            await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
+            var oboDescriptor = new OpenIddictApplicationDescriptor
             {
                 ClientId = "obo-client",
                 ClientSecret = GetClientSecret("obo-client"),
@@ -210,12 +210,15 @@ public sealed class DatabaseInitializer(
                 Permissions =
                 {
                     Permissions.Endpoints.Token,
+                    Permissions.Endpoints.Introspection,
                     Permissions.Endpoints.Revocation,
                     Permissions.Prefixes.GrantType + OAuthGrantTypes.TokenExchange,
                     Permissions.GrantTypes.ClientCredentials,
                     Permissions.Prefixes.Scope + "api"
                 }
-            }, cancellationToken);
+            };
+            ClientAudienceProperties.SetAllowedAudiences(oboDescriptor.Properties, ["resource_server"]);
+            await applicationManager.CreateAsync(oboDescriptor, cancellationToken);
         }
 
         if (await applicationManager.FindByClientIdAsync("introspection-client", cancellationToken) is null)
@@ -312,10 +315,15 @@ public sealed class DatabaseInitializer(
         await EnsureClientPermissionsAsync("obo-client", descriptor =>
         {
             AddPermission(descriptor, Permissions.Endpoints.Token);
+            AddPermission(descriptor, Permissions.Endpoints.Introspection);
             AddPermission(descriptor, Permissions.Endpoints.Revocation);
             AddPermission(descriptor, Permissions.Prefixes.GrantType + OAuthGrantTypes.TokenExchange);
             AddPermission(descriptor, Permissions.GrantTypes.ClientCredentials);
             AddPermission(descriptor, Permissions.Prefixes.Scope + "api");
+            if (ClientAudienceProperties.GetAllowedAudiences(descriptor.Properties).Count == 0)
+            {
+                ClientAudienceProperties.SetAllowedAudiences(descriptor.Properties, ["resource_server"]);
+            }
         }, cancellationToken);
 
         await EnsureClientPermissionsAsync("admin-client", descriptor =>

@@ -8,6 +8,7 @@ public sealed record ClientResponse(
     IReadOnlyList<string> PostLogoutRedirectUris,
     IReadOnlyList<string> GrantTypes,
     IReadOnlyList<string> Scopes,
+    IReadOnlyList<string> AllowedAudiences,
     bool RequirePkce);
 
 public sealed record CreateClientRequest(
@@ -19,6 +20,7 @@ public sealed record CreateClientRequest(
     IReadOnlyList<string>? PostLogoutRedirectUris,
     IReadOnlyList<string>? GrantTypes,
     IReadOnlyList<string>? Scopes,
+    IReadOnlyList<string>? AllowedAudiences = null,
     bool RequirePkce = true);
 
 public sealed record UpdateClientRequest(
@@ -28,4 +30,5 @@ public sealed record UpdateClientRequest(
     IReadOnlyList<string>? PostLogoutRedirectUris,
     IReadOnlyList<string>? GrantTypes,
     IReadOnlyList<string>? Scopes,
+    IReadOnlyList<string>? AllowedAudiences,
     bool? RequirePkce);

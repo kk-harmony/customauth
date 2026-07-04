@@ -21,15 +21,15 @@ public static class OpenIddictServerExtensions
 
         var issuerUri = new Uri(oauthOptions.Issuer, UriKind.Absolute);
         var allowHttp = string.Equals(issuerUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
-        if (environment.IsProduction() && string.IsNullOrWhiteSpace(oauthOptions.SigningCertificatePath))
+        var hasSigningCertificate = !string.IsNullOrWhiteSpace(oauthOptions.SigningCertificatePath);
+        if (environment.IsProduction() && !hasSigningCertificate)
         {
             throw new InvalidOperationException(
                 "OAuthServer__SigningCertificatePath is required in Production. " +
                 "Set it via environment variables (see PRODUCTION.md).");
         }
 
-        var useProductionCertificates = environment.IsProduction()
-            && !string.IsNullOrWhiteSpace(oauthOptions.SigningCertificatePath);
+        var useFileCertificates = hasSigningCertificate;
 
         services.AddOpenIddict()
             .AddCore(options =>
@@ -67,7 +67,7 @@ public static class OpenIddictServerExtensions
                     "api",
                     "admin");
 
-                if (useProductionCertificates)
+                if (useFileCertificates)
                 {
                     var signing = LoadCertificate(
                         oauthOptions.SigningCertificatePath!,

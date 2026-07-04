@@ -154,49 +154,113 @@ public sealed class TokenController(
         OpenIddictRequest request,
         CancellationToken cancellationToken)
     {
+        var subjectTokenType = request.GetParameter("subject_token_type")?.ToString();
+        var validationFailure = TokenExchangeValidator.ValidateSubjectTokenType(subjectTokenType);
+        if (validationFailure is not null)
+        {
+            return TokenExchangeFailureResult(validationFailure);
+        }
+
+        var audience = request.GetParameter("audience")?.ToString();
+        validationFailure = TokenExchangeValidator.ValidateAudience(audience);
+        if (validationFailure is not null)
+        {
+            return TokenExchangeFailureResult(validationFailure);
+        }
+
         var subjectPrincipal = await ResolveSubjectPrincipalAsync(request, cancellationToken);
         if (subjectPrincipal is null)
         {
-            return Forbid(
-                authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                properties: new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The subject token is invalid."
-                }));
+            return InvalidGrant("The subject token is invalid.");
         }
 
         var subject = subjectPrincipal.GetClaim(Claims.Subject)!;
+        if (await applicationManager.FindByClientIdAsync(subject, cancellationToken) is not null)
+        {
+            return InvalidGrant("Subject token must represent an end user.");
+        }
+
+        var user = await userRepository.FindByIdAsync(subject, cancellationToken);
+        if (user is null)
+        {
+            return InvalidGrant("Subject token must represent an end user.");
+        }
+
+        var application = await applicationManager.FindByClientIdAsync(request.ClientId!, cancellationToken)
+            ?? throw new InvalidOperationException("The application cannot be found.");
+
+        var clientDescriptor = new OpenIddictApplicationDescriptor();
+        await applicationManager.PopulateAsync(clientDescriptor, application, cancellationToken);
+        var allowedAudiences = ClientAudienceProperties.GetAllowedAudiences(clientDescriptor.Properties);
+
+        validationFailure = TokenExchangeValidator.ValidateAudienceAllowlist(audience!, allowedAudiences);
+        if (validationFailure is not null)
+        {
+            return TokenExchangeFailureResult(validationFailure);
+        }
+
+        var exchangeScopes = TokenExchangeValidator.ResolveExchangeScopes(
+            request.GetScopes(),
+            subjectPrincipal,
+            user.Roles);
+
         var identity = new ClaimsIdentity(
             authenticationType: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
             nameType: Claims.Name,
             roleType: Claims.Role);
 
-        identity.SetClaim(Claims.Subject, subject);
-        identity.SetClaim(Claims.Name, subjectPrincipal.GetClaim(Claims.Name));
-        identity.SetClaim(Claims.Email, subjectPrincipal.GetClaim(Claims.Email));
-        identity.SetScopes(request.GetScopes().Length > 0 ? request.GetScopes() : ["api"]);
-        identity.SetResources(await scopeManager.ListResourcesAsync(identity.GetScopes(), cancellationToken).ToListAsync());
-        identity.SetDestinations(_ => [Destinations.AccessToken]);
+        identity.SetClaim(Claims.Subject, user.Id)
+            .SetClaim(Claims.Name, user.DisplayName ?? user.Username)
+            .SetClaim(Claims.Email, user.Email)
+            .SetClaim(Claims.PreferredUsername, user.Username);
 
-        var actorToken = request.GetParameter("actor_token")?.ToString();
-        if (!string.IsNullOrEmpty(actorToken))
+        foreach (var role in user.Roles)
         {
-            identity.SetClaim("act", request.ClientId);
+            identity.AddClaim(new Claim(Claims.Role, role));
         }
 
+        identity.SetClaim("act", request.ClientId);
+        identity.SetDestinations(GetDestinations);
+        identity.SetScopes(exchangeScopes);
+        identity.SetResources(audience!);
+
         logger.LogInformation(
-            "On-behalf-of token issued. Subject={Subject}, RequestedClient={ClientId}",
-            subject, request.ClientId);
+            "On-behalf-of token issued. Subject={Subject}, RequestedClient={ClientId}, Audience={Audience}",
+            user.Id, request.ClientId, audience);
         await auditService.WriteAsync(
             "token.issued",
-            subject,
+            user.Id,
             OAuthGrantTypes.TokenExchange,
-            new { subject, request.ClientId, Scopes = identity.GetScopes() },
+            new { subject = user.Id, request.ClientId, audience, Scopes = exchangeScopes },
             cancellationToken);
 
         return SignIn(new ClaimsPrincipal(identity), OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
+
+    private IActionResult TokenExchangeFailureResult(TokenExchangeFailure failure) =>
+        failure.Kind switch
+        {
+            TokenExchangeFailureKind.InvalidRequest => BadRequest(new OpenIddictResponse
+            {
+                Error = Errors.InvalidRequest,
+                ErrorDescription = failure.Description
+            }),
+            TokenExchangeFailureKind.InvalidTarget => BadRequest(new OpenIddictResponse
+            {
+                Error = "invalid_target",
+                ErrorDescription = failure.Description
+            }),
+            _ => InvalidGrant(failure.Description)
+        };
+
+    private IActionResult InvalidGrant(string description) =>
+        Forbid(
+            authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+            properties: new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = description
+            }));
 
     private async Task<ClaimsPrincipal?> ResolveSubjectPrincipalAsync(
         OpenIddictRequest request,
